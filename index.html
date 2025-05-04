@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Directorios</title>
+</head>
+<body>
+    <h1>Gestor de Directorios y Archivos</h1>
+
+    <h2>Crear Directorio</h2>
+    <form id="form-crear-directorio">
+        <label for="nombre">Nombre:</label>
+        <input type="text" id="nombre" name="nombre" required><br>
+        <label for="apellido">Apellido:</label>
+        <input type="text" id="apellido" name="apellido" required><br>
+        <label for="cod">Código:</label>
+        <input type="text" id="cod" name="cod" required><br>
+        <button type="submit">Crear Directorio</button>
+    </form>
+    <p id="mensaje-crear" style="color: green;"></p>
+
+    <hr>
+
+    <h2>Subir Archivo</h2>
+    <form action="http://localhost:3000/subir-archivo" method="POST" enctype="multipart/form-data">
+        <label for="directorio">Seleccionar Directorio:</label>
+        <select id="directorio" name="directorio"></select><br>
+        <label for="archivo">Seleccionar Archivo:</label>
+        <input type="file" id="archivo" name="archivo" required><br>
+        <button type="submit">Subir Archivo</button>
+    </form>
+
+    <hr>
+
+    <h2>Listado de Directorios</h2>
+    <button id="listar-directorios">Mostrar Directorios</button>
+    <ul id="directorios"></ul>
+
+    <h3>Archivos del directorio seleccionado:</h3>
+    <select id="selector-directorio-archivos"></select>
+    <ul id="lista-archivos"></ul>
+
+    <script>
+        function cargarDirectorios() {
+            fetch('http://localhost:3000/listar-directorios')
+                .then(response => response.json())
+                .then(directorios => {
+                    const select = document.getElementById('directorio');
+                    const list = document.getElementById('directorios');
+                    select.innerHTML = '';
+                    list.innerHTML = '';
+
+                    directorios.forEach(directorio => {
+                        const option = document.createElement('option');
+                        option.value = directorio;
+                        option.textContent = directorio;
+                        select.appendChild(option);
+
+                        const li = document.createElement('li');
+                        li.textContent = directorio;
+                        list.appendChild(li);
+                    });
+
+                    sincronizarSelectores(directorios);
+                })
+                .catch(error => {
+                    console.error('Error al listar directorios:', error);
+                });
+        }
+
+        document.getElementById('form-crear-directorio').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const nombre = document.getElementById('nombre').value;
+            const apellido = document.getElementById('apellido').value;
+            const cod = document.getElementById('cod').value;
+
+            fetch('http://localhost:3000/crear-directorio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre, apellido, cod })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const mensaje = document.getElementById('mensaje-crear');
+                if (data.mensaje) {
+                    mensaje.textContent = data.mensaje;
+                    mensaje.style.color = 'green';
+                    document.getElementById('form-crear-directorio').reset();
+                    cargarDirectorios();
+                } else {
+                    mensaje.textContent = data.error || 'Ocurrió un error.';
+                    mensaje.style.color = 'red';
+                }
+            })
+            .catch(() => {
+                const mensaje = document.getElementById('mensaje-crear');
+                mensaje.textContent = 'Error al crear el directorio';
+                mensaje.style.color = 'red';
+            });
+        });
+
+        document.getElementById('selector-directorio-archivos').addEventListener('change', function () {
+            const directorio = this.value;
+            fetch(`http://localhost:3000/listar-archivos/${directorio}`)
+                .then(response => response.json())
+                .then(archivos => {
+                    const lista = document.getElementById('lista-archivos');
+                    lista.innerHTML = '';
+                    archivos.forEach(archivo => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <a href="usuarios/${directorio}/${archivo}" target="_blank">${archivo}</a>
+                            <button onclick="eliminarArchivo('${directorio}', '${archivo}')">Eliminar</button>`;
+                        lista.appendChild(li);
+                    });
+                });
+        });
+
+        function eliminarArchivo(directorio, archivo) {
+            if (confirm(`¿Eliminar el archivo ${archivo}?`)) {
+                fetch(`http://localhost:3000/eliminar-archivo/${directorio}/${archivo}`, {
+                    method: 'DELETE'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.mensaje);
+                    document.getElementById('selector-directorio-archivos').dispatchEvent(new Event('change'));
+                });
+            }
+        }
+
+        function sincronizarSelectores(directorios) {
+            const selector = document.getElementById('selector-directorio-archivos');
+            selector.innerHTML = '';
+            directorios.forEach(dir => {
+                const option = document.createElement('option');
+                option.value = dir;
+                option.textContent = dir;
+                selector.appendChild(option);
+            });
+            selector.dispatchEvent(new Event('change'));
+        }
+
+        document.getElementById('listar-directorios').addEventListener('click', cargarDirectorios);
+        window.onload = cargarDirectorios;
+    </script>
+</body>
+</html>
